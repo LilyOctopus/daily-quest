@@ -6,6 +6,7 @@ export interface Task {
   category: Category
   completed: boolean
   estMinutes: number
+  detail?: string
 }
 
 export interface DayQuest {
