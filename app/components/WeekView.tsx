@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef, useEffect } from 'react'
 import type { DayQuest } from '../types'
 import DayCard from './DayCard'
 
@@ -15,12 +16,8 @@ interface Props {
   onAccumulateTime: (dateKey: string, minutes: number) => void
 }
 
-function formatWeekLabel(days: DayQuest[]): string {
-  if (days.length === 0) return ''
-  const start = new Date(days[0].date)
-  const end = new Date(days[days.length - 1].date)
-  const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`
-  return `${fmt(start)} - ${fmt(end)}`
+function formatDateLabel(d: Date): string {
+  return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
 export default function WeekView({
@@ -34,6 +31,23 @@ export default function WeekView({
   onCheckIn,
   onAccumulateTime,
 }: Props) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const todayRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to today's card on mount / days change
+  useEffect(() => {
+    if (todayRef.current && scrollRef.current) {
+      const container = scrollRef.current
+      const card = todayRef.current
+      const scrollLeft = card.offsetLeft - container.offsetLeft - 16 // 16px padding
+      container.scrollTo({ left: scrollLeft, behavior: 'smooth' })
+    }
+  }, [days])
+
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const start = days.length > 0 ? new Date(days[0].date) : new Date()
+  const end = days.length > 0 ? new Date(days[days.length - 1].date) : new Date()
+
   return (
     <div>
       {/* Week nav */}
@@ -41,8 +55,11 @@ export default function WeekView({
         <button onClick={onPrevWeek} className="p-2 hover:bg-gray-100 rounded-xl text-gray-500 text-sm">
           ← Prev
         </button>
-        <div className="flex items-center gap-3">
-          <span className="font-semibold text-gray-700 text-sm">{formatWeekLabel(days)}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-gray-700 text-sm">{formatDateLabel(start)} - {formatDateLabel(end)}</span>
+          <span className="text-xs text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">
+            Today {formatDateLabel(new Date())}
+          </span>
           {!isCurrentWeek && (
             <button
               onClick={onGoCurrentWeek}
@@ -62,20 +79,28 @@ export default function WeekView({
       </div>
 
       {/* Day cards — horizontal scroll */}
-      <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4 scrollbar-thin">
+      <div
+        ref={scrollRef}
+        className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4 scrollbar-thin"
+      >
         {days.map(day => (
-          <DayCard
+          <div
             key={day.date}
-            day={day}
-            onToggleTask={(taskId) => onToggleTask(day.date, taskId)}
-            onCheckIn={() => onCheckIn(day.date)}
-            onAccumulateTime={(mins) => onAccumulateTime(day.date, mins)}
-          />
+            ref={day.date === todayStr ? todayRef : undefined}
+            className="flex-shrink-0 snap-center"
+          >
+            <DayCard
+              day={day}
+              onToggleTask={(taskId) => onToggleTask(day.date, taskId)}
+              onCheckIn={() => onCheckIn(day.date)}
+              onAccumulateTime={(mins) => onAccumulateTime(day.date, mins)}
+            />
+          </div>
         ))}
       </div>
 
       {/* Summary */}
-      <div className="mt-2 px-1 text-sm text-gray-400 flex gap-4">
+      <div className="mt-2 px-1 text-sm text-gray-400 flex gap-4 flex-wrap">
         <span>Tasks: {days.reduce((s, d) => s + d.tasks.filter(t => t.completed).length, 0)}/{days.reduce((s, d) => s + d.tasks.length, 0)}</span>
         <span>Study: {days.reduce((s, d) => s + d.studyMinutes, 0)}min</span>
         <span>✅ {days.filter(d => d.checkIn).length}/7</span>
